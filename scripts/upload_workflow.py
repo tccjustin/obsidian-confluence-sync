@@ -158,6 +158,9 @@ def main():
     if args.update_if_exists:
         upload_cmd.append('--update-if-exists')
     
+    # Django 테마 적용
+    upload_cmd.append('--django-theme')
+    
     if not run_command(upload_cmd, "Confluence 업로드"):
         sys.exit(1)
     

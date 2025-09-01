@@ -7,14 +7,15 @@ Confluence Storage Format (.csf) 페이지와 모든 참조된 첨부파일을 �
 2) .csf 파일을 파싱하여 ri:attachment 파일명을 찾음
 3) 제공된 검색 루트에서 일치하는 파일을 찾음 (기본값: CSF 폴더)
 4) 페이지에 새 첨부파일을 업로드하거나 기존 첨부파일을 업데이트
+5) 코드 블록의 테마를 Django로 변경하거나 추가
 
 Confluence Data Center/Server REST v1 (/rest/api) 사용. 인증: Bearer PAT
 
 사용법:
-    python upload_csf_with_attachments.py <csf_path> <title> <parent_page_id> <space_key> <token> <domain> [--update-if-exists] [--search-root <path>] [--base-path <path>]
+    python upload_csf_with_attachments.py <csf_path> <title> <parent_page_id> <space_key> <token> <domain> [--update-if-exists] [--search-root <path>] [--base-path <path>] [--django-theme]
 
 예시:
-    python upload_csf_with_attachments.py "example.csf" "Example Page" "11763773" "~B030240" "YOUR_PAT" "wiki.telechips.com" --update-if-exists
+    python upload_csf_with_attachments.py "example.csf" "Example Page" "11763773" "~B030240" "YOUR_PAT" "wiki.telechips.com" --update-if-exists --django-theme
 """
 
 import os
@@ -145,6 +146,51 @@ def update_page_payload(title: str, space_key: str, new_version: int, csf_conten
         }
     }
 
+def convert_code_blocks_to_django_theme(csf_content: str) -> str:
+    """
+    CSF 내용의 모든 코드 블록에 Django 테마를 추가하거나 변경
+    
+    Args:
+        csf_content: 원본 CSF 내용
+        
+    Returns:
+        Django 테마가 적용된 CSF 내용
+    """
+    # 코드 블록을 찾는 정규식 패턴
+    code_block_pattern = r'(<ac:structured-macro ac:name="code"[^>]*>)(.*?)(</ac:structured-macro>)'
+    
+    def process_code_block(match):
+        opening_tag = match.group(1)
+        content = match.group(2)
+        closing_tag = match.group(3)
+        
+        # 테마 파라미터가 이미 있는지 확인
+        theme_pattern = r'<ac:parameter ac:name="theme">[^<]+</ac:parameter>'
+        theme_match = re.search(theme_pattern, content)
+        
+        if theme_match:
+            # 기존 테마를 Django로 변경
+            new_content = re.sub(theme_pattern, '<ac:parameter ac:name="theme">DJango</ac:parameter>', content)
+        else:
+            # 테마 파라미터가 없으면 추가 (첫 번째 ac:parameter 태그 뒤에)
+            first_param_pattern = r'(<ac:parameter[^>]*>[^<]*</ac:parameter>)'
+            first_param_match = re.search(first_param_pattern, content)
+            
+            if first_param_match:
+                # 첫 번째 파라미터 뒤에 테마 파라미터 추가
+                insert_pos = first_param_match.end()
+                new_content = content[:insert_pos] + '<ac:parameter ac:name="theme">DJango</ac:parameter>' + content[insert_pos:]
+            else:
+                # 파라미터가 전혀 없으면 내용 시작 부분에 테마 파라미터 추가
+                new_content = '<ac:parameter ac:name="theme">DJango</ac:parameter>' + content
+        
+        return opening_tag + new_content + closing_tag
+    
+    # 모든 코드 블록을 처리
+    converted_content = re.sub(code_block_pattern, process_code_block, csf_content, flags=re.DOTALL)
+    
+    return converted_content
+
 def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description='CSF 파일과 첨부파일을 Confluence에 업로드')
@@ -157,6 +203,7 @@ def main():
     parser.add_argument('--base-path', default='/', help='기본 경로 (기본값: "/")')
     parser.add_argument('--search-root', nargs='*', help='첨부파일 검색 디렉토리 (기본값: CSF 폴더)')
     parser.add_argument('--update-if-exists', action='store_true', help='기존 페이지가 있으면 업데이트')
+    parser.add_argument('--django-theme', action='store_true', help='코드 블록의 테마를 Django로 변경')
     
     args = parser.parse_args()
     
@@ -188,6 +235,7 @@ def main():
     print(f"Parent   : {args.parent_page_id}")
     print(f"Space    : {args.space_key}")
     print(f"Search   : {', '.join(args.search_root)}")
+    print(f"Django Theme: {'활성화' if args.django_theme else '비활성화'}")
     
     # 0) 부모 페이지 확인
     try:
@@ -200,6 +248,20 @@ def main():
     # 1) CSF 파일 읽기
     with open(csf_file, 'r', encoding='utf-8') as f:
         csf_content = f.read()
+    
+    # 1-1) Django 테마 적용 (옵션)
+    if args.django_theme:
+        print("코드 블록을 Django 테마로 변환 중...")
+        original_content = csf_content
+        csf_content = convert_code_blocks_to_django_theme(csf_content)
+        
+        # 변환된 내용 확인
+        code_blocks_before = len(re.findall(r'<ac:structured-macro ac:name="code"', original_content))
+        code_blocks_after = len(re.findall(r'<ac:structured-macro ac:name="code"', csf_content))
+        django_themes = len(re.findall(r'<ac:parameter ac:name="theme">DJango</ac:parameter>', csf_content))
+        
+        print(f"코드 블록 수: {code_blocks_before} -> {code_blocks_after}")
+        print(f"Django 테마 적용된 블록: {django_themes}")
     
     # 2) 페이지 생성/업데이트
     page_id = None
