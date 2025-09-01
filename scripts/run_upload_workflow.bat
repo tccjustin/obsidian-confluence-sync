@@ -10,3 +10,4 @@ REM Python 스크립트 실행
 python "%~dp0upload_workflow.py" %*
 
 pause
+

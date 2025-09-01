@@ -8,3 +8,4 @@ set PYTHONPATH=%SCRIPT_DIR%;%PYTHONPATH%
 python "%~dp0upload_csf_with_attachments.py" %*
 
 pause
+

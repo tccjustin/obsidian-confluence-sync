@@ -8,3 +8,4 @@ set PYTHONPATH=%SCRIPT_DIR%;%PYTHONPATH%
 python "%~dp0convert_obsidian_md_to_html.py" %*
 
 pause
+

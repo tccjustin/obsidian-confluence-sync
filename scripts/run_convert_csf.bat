@@ -8,3 +8,4 @@ set PYTHONPATH=%SCRIPT_DIR%;%PYTHONPATH%
 python "%~dp0convert_csf_obsidian_to_confluence.py" %*
 
 pause
+

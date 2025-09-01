@@ -8,3 +8,4 @@ set PYTHONPATH=%SCRIPT_DIR%;%PYTHONPATH%
 python "%~dp0space_fill.py" %*
 
 pause
+
